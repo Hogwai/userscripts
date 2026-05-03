@@ -1,0 +1,14 @@
+{
+  "name": "userscripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "build:all": "node build.js --all --no-version",
+    "validate:manifest": "node scripts/validate-manifest.js",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "rollup": "^4.60.2"
+  }
+}

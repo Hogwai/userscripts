@@ -1,0 +1,23 @@
+{
+  "sites": {
+    "lacentrale.fr": {
+      "scripts": {
+        "LaCentraleEnhancer": {
+          "name": "LaCentraleEnhancer",
+          "version": "0.0.1",
+          "description": "Enhancements for lacentrale.fr.",
+          "author": "Hogwai",
+          "license": "MIT",
+          "entry": "lacentrale.fr/LaCentraleEnhancer/index.js",
+          "output": "dist/LaCentraleEnhancer.user.js",
+          "includes": [
+            "https://www.lacentrale.fr/listing*"
+          ],
+          "grants": [
+            "none"
+          ]
+        }
+      }
+    }
+  }
+}

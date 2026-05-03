@@ -1,0 +1,234 @@
+name: Release Userscripts
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - userscripts.json
+  workflow_dispatch:
+    inputs:
+      script:
+        description: 'Script id (site/script) or all'
+        required: false
+        default: all
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has-changes: ${{ steps.detect.outputs.has-changes }}
+      matrix: ${{ steps.detect.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Detect release candidates
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
+          INPUT_SCRIPT: ${{ github.event.inputs.script }}
+        run: |
+          node --input-type=module <<'EOF' >> "$GITHUB_OUTPUT"
+          import { execFileSync } from 'node:child_process';
+          import { readFileSync } from 'node:fs';
+
+          const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+          const ID_PART_RE = /^[A-Za-z0-9._-]+$/;
+          const OUTPUT_RE = /^dist\/(?!\.\.)(?!.*\.\.)[^\/\r\n\u2028\u2029*?\[\]{}\\]+\.user\.js$/;
+
+          function parseManifest(text, { allowEmpty = false } = {}) {
+            if (allowEmpty && (!text || !text.trim())) return { sites: {} };
+            let parsed;
+            try {
+              parsed = JSON.parse(text);
+            } catch (error) {
+              throw new Error(`Invalid userscripts.json: ${error.message}`);
+            }
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+              throw new Error('Invalid userscripts.json: root must be an object');
+            }
+            if (typeof parsed.sites !== 'object' || Array.isArray(parsed.sites)) {
+              throw new Error('Invalid userscripts.json: sites must be an object');
+            }
+            return parsed;
+          }
+
+          function validateManifest(manifest) {
+            if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) {
+              throw new Error('Invalid userscripts.json: root must be an object');
+            }
+            if (!manifest.sites || typeof manifest.sites !== 'object' || Array.isArray(manifest.sites)) {
+              throw new Error('Invalid userscripts.json: sites must be an object');
+            }
+          }
+
+          function listScripts(manifest) {
+            const result = [];
+            for (const [site, siteConfig] of Object.entries(manifest.sites)) {
+              if (!ID_PART_RE.test(site)) {
+                throw new Error(`Invalid site id: ${site}`);
+              }
+              if (!siteConfig || typeof siteConfig !== 'object' || Array.isArray(siteConfig)) {
+                throw new Error(`Invalid site config: ${site}`);
+              }
+              if (siteConfig.scripts == null || typeof siteConfig.scripts !== 'object' || Array.isArray(siteConfig.scripts)) {
+                throw new Error(`Invalid scripts object: ${site}`);
+              }
+              const scripts = siteConfig.scripts;
+              for (const [script, scriptConfig] of Object.entries(scripts)) {
+                if (!ID_PART_RE.test(script)) {
+                  throw new Error(`Invalid script id: ${site}/${script}`);
+                }
+                if (!scriptConfig || typeof scriptConfig !== 'object' || Array.isArray(scriptConfig)) {
+                  throw new Error(`Invalid script config: ${site}/${script}`);
+                }
+                if (!SEMVER_RE.test(String(scriptConfig.version ?? ''))) {
+                  throw new Error(`Invalid version for ${site}/${script}: ${scriptConfig.version ?? ''}`);
+                }
+                if (typeof scriptConfig.name !== 'string' || scriptConfig.name.trim() === '') {
+                  throw new Error(`Invalid name for ${site}/${script}`);
+                }
+                if (typeof scriptConfig.entry !== 'string' || scriptConfig.entry.trim() === '') {
+                  throw new Error(`Invalid entry for ${site}/${script}`);
+                }
+                if (typeof scriptConfig.output !== 'string' || !OUTPUT_RE.test(scriptConfig.output)) {
+                  throw new Error(`Invalid output for ${site}/${script}`);
+                }
+                result.push({
+                  id: `${site}/${script}`,
+                  site,
+                  script,
+                  version: scriptConfig.version,
+                  output: scriptConfig.output,
+                });
+              }
+            }
+            return result;
+          }
+
+          function gitShow(ref) {
+            try {
+              return execFileSync('git', ['show', `${ref}:userscripts.json`], { encoding: 'utf8' });
+            } catch {
+              return null;
+            }
+          }
+
+          const current = parseManifest(readFileSync('userscripts.json', 'utf8'));
+          validateManifest(current);
+          const currentScripts = listScripts(current);
+          const currentById = new Map(currentScripts.map((item) => [item.id, item]));
+
+          const inputScript = String(process.env.INPUT_SCRIPT ?? 'all').trim() || 'all';
+          const eventName = process.env.EVENT_NAME ?? '';
+          const eventBefore = String(process.env.EVENT_BEFORE ?? '').trim();
+
+          if (eventName === 'workflow_dispatch' && inputScript !== 'all' && !currentById.has(inputScript)) {
+            throw new Error(`Unknown script id: ${inputScript}`);
+          }
+
+          if (inputScript !== 'all') {
+            const [site, script] = inputScript.split('/');
+            if (!site || !script || inputScript.split('/').length !== 2 || !ID_PART_RE.test(site) || !ID_PART_RE.test(script)) {
+              throw new Error(`Invalid script id format: ${inputScript}`);
+            }
+          }
+
+          const selected = inputScript === 'all'
+            ? currentScripts
+            : currentScripts.filter((item) => item.id === inputScript);
+
+          const isZeroBefore = !eventBefore || /^0+$/.test(eventBefore);
+          const previousText = eventName === 'push' && !isZeroBefore ? gitShow(eventBefore) : '';
+          const previous = eventName === 'push'
+            ? parseManifest(previousText ?? '', { allowEmpty: isZeroBefore || previousText == null })
+            : { sites: {} };
+          if (eventName === 'push' && !isZeroBefore && previousText != null) {
+            validateManifest(previous);
+          }
+          const previousById = new Map(listScripts(previous).map((item) => [item.id, item]));
+
+          const changed = selected.filter((item) => {
+            const prev = previousById.get(item.id);
+            return !prev || prev.version !== item.version;
+          }).filter((item) => item.output);
+
+          const tags = new Set();
+          for (const item of currentScripts) {
+            const tag = `${item.site}-${item.script}-v${item.version}`;
+            if (tags.has(tag)) {
+              throw new Error(`Duplicate release tag: ${tag}`);
+            }
+            tags.add(tag);
+          }
+
+          const matrix = { include: changed.map((item) => ({
+            id: item.id,
+            site: item.site,
+            script: item.script,
+            version: item.version,
+            output: item.output,
+            tag: `${item.site}-${item.script}-v${item.version}`,
+            releaseName: `${item.site} / ${item.script} v${item.version}`,
+          })) };
+
+          process.stdout.write(`has-changes=${changed.length > 0}\n`);
+          process.stdout.write(`matrix=${JSON.stringify(matrix)}\n`);
+          EOF
+
+  release:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has-changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate manifest
+        run: npm run validate:manifest
+
+      - name: Build script
+        env:
+          SCRIPT_ID: ${{ matrix.id }}
+        run: node build.js --script "$SCRIPT_ID" --no-version
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.tag }}
+          name: ${{ matrix.releaseName }}
+          body: ${{ matrix.releaseName }}
+          files: ${{ matrix.output }}
