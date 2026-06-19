@@ -23,7 +23,7 @@
       "scripts": {
         "LinkedInScheduledCalendar": {
           "name": "LinkedInScheduledCalendar",
-          "version": "0.0.10",
+          "version": "0.0.1",
           "description": "Add calendar view with highlighted scheduled posts on LinkedIn.",
           "author": "Hogwai",
           "license": "MIT",
