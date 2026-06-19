@@ -18,6 +18,25 @@
           ]
         }
       }
+    },
+    "linkedin.com": {
+      "scripts": {
+        "LinkedInScheduledCalendar": {
+          "name": "LinkedInScheduledCalendar",
+          "version": "0.0.1",
+          "description": "Add calendar view with highlighted scheduled posts on LinkedIn.",
+          "author": "Hogwai",
+          "license": "MIT",
+          "entry": "linkedin.com/LinkedInScheduledCalendar/index.js",
+          "output": "dist/LinkedInScheduledCalendar.user.js",
+          "includes": [
+            "https://www.linkedin.com/*"
+          ],
+          "grants": [
+            "none"
+          ]
+        }
+      }
     }
   }
 }
