@@ -35,6 +35,23 @@
           "grants": [
             "none"
           ]
+        },
+        "LinkedinSafetyPageSkip": {
+          "name": "LinkedinSafetyPageSkip",
+          "version": "1.0.1",
+          "description": "Skip the security page when you click on an external link",
+          "author": "Hogwai",
+          "license": "MIT",
+          "entry": "linkedin.com/LinkedinSafetyPageSkip/index.js",
+          "output": "dist/LinkedinSafetyPageSkip.user.js",
+          "includes": [
+            "*://*.linkedin.*/safety/*",
+            "*://lnkd.in/*"
+          ],
+          "grants": [
+            "none"
+          ],
+          "runAt": "document-start"
         }
       }
     }
