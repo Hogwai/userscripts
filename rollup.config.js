@@ -7,7 +7,7 @@ function sanitize(value) {
 function metadataBlock(item) {
   const includes = item.includes ?? [`*://*.${item.site}/*`];
   const grants = item.grants ?? ['none'];
-  return [
+  const lines = [
     '// ==UserScript==',
     `// @name        ${sanitize(item.name)}`,
     `// @namespace   ${sanitize(item.namespace ?? 'userscripts')}`,
@@ -19,7 +19,11 @@ function metadataBlock(item) {
     '// @noframes',
     `// @license     ${sanitize(item.license)}`,
     '// ==/UserScript==',
-  ].join('\n');
+  ];
+  if (item.runAt) {
+    lines.splice(lines.length - 1, 0, `// @run-at      ${sanitize(item.runAt)}`);
+  }
+  return lines.join('\n');
 }
 
 const manifest = readManifest();

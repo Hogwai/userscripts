@@ -205,8 +205,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -225,10 +223,36 @@ jobs:
           SCRIPT_ID: ${{ matrix.id }}
         run: node build.js --script "$SCRIPT_ID" --no-version
 
+      - name: Update README with release URL
+        run: |
+          TAG_PREFIX="$(echo "${{ matrix.id }}" | tr '/' '-')-v"
+          sed -i "s|/download/${TAG_PREFIX}[^/]*/|/download/${{ matrix.tag }}/|" README.md
+
+          if ! git diff --quiet README.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            git commit -m "chore: update ${{ matrix.script }} download URL to ${{ matrix.version }}"
+            git pull --rebase
+            git push
+          fi
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ matrix.tag }}
           name: ${{ matrix.releaseName }}
-          body: ${{ matrix.releaseName }}
+          body: |
+            ## ${{ matrix.releaseName }}
+
+            **Version**: ${{ matrix.version }}
+
+            ### Installation
+            1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/)
+            2. Click on the userscript file below to install it
+
+            **Direct install link**: [${{ matrix.script }}.user.js](https://github.com/${{ github.repository }}/releases/download/${{ matrix.tag }}/${{ matrix.script }}.user.js)
+
+            ### Changes
+            See commit history for details.
           files: ${{ matrix.output }}

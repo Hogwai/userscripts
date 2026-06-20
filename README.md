@@ -12,10 +12,11 @@ npm install
 
 ## Scripts
 
-| Script | Site | Description |
-|--------|------|-------------|
-| `LaCentraleEnhancer` | `lacentrale.fr/listing*` | Sticky pagination, preview overlay with photo carousel, favorites |
-| `LinkedInScheduledCalendar` | `linkedin.com/*` | Calendar grid view of scheduled posts with date-based highlights |
+| Script | Install |
+|--------|---------|
+| `LaCentraleEnhancer` | [![Install from Greasyfork](https://img.shields.io/badge/Install%20from-Greasyfork-990000?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://greasyfork.org/fr/scripts/576491-lacentraleenhancer) [![Install from GitHub](https://img.shields.io/badge/Install%20from-GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hogwai/userscripts/releases/download/lacentrale.fr-LaCentraleEnhancer-v0.0.1/LaCentraleEnhancer.user.js) |
+| `LinkedInScheduledCalendar` | [![Install from Greasyfork](https://img.shields.io/badge/Install%20from-Greasyfork-990000?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://greasyfork.org/fr/scripts/583449-linkedinscheduledcalendar) [![Install from GitHub](https://img.shields.io/badge/Install%20from-GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hogwai/userscripts/releases/download/linkedin.com-LinkedInScheduledCalendar-v0.0.1/LinkedInScheduledCalendar.user.js) |
+| `LinkedinSafetyPageSkip` | [![Install from Greasyfork](https://img.shields.io/badge/Install%20from-Greasyfork-990000?style=for-the-badge&logo=tampermonkey&logoColor=white)](https://greasyfork.org/fr/scripts/553715-linkedin-safety-page-skip) [![Install from GitHub](https://img.shields.io/badge/Install%20from-GitHub-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hogwai/userscripts/releases/download/linkedin.com-LinkedinSafetyPageSkip-v1.0.1/LinkedinSafetyPageSkip.user.js) |
 
 ### LaCentraleEnhancer
 
@@ -40,6 +41,14 @@ Adds a calendar view to LinkedIn's scheduled posts modal, making it easier to vi
 - Toggle back to list view without losing state
 - `Manage scheduled posts` link in the empty-state footer
 
+### LinkedinSafetyPageSkip
+
+Skips LinkedIn's safety/security interstitial page and redirects immediately when you click an external link.
+
+- Extracts the destination URL from the safety page's query parameter or fallback link
+- Redirects before the page finishes loading (`document-start`)
+- Handles both `safety/*` paths and `lnkd.in` shortened links
+
 ## Usage
 
 ```bash
@@ -54,6 +63,9 @@ node build.js --script lacentrale.fr/LaCentraleEnhancer
 
 # Build a specific script, no version bump
 node build.js --script linkedin.com/LinkedInScheduledCalendar --no-version
+
+# Build LinkedinSafetyPageSkip
+node build.js --script linkedin.com/LinkedinSafetyPageSkip --no-version
 
 # Validate manifest
 npm run validate:manifest
@@ -83,11 +95,14 @@ linkedin.com/LinkedInScheduledCalendar/ # Source: LinkedInScheduledCalendar
   post-parser.js    # DOM -> post data extraction
   calendar-ui.js    # HTML templates, grid/detail rendering
   buttons.js        # Calendar button and management link injection
+
+linkedin.com/LinkedinSafetyPageSkip/   # Source: LinkedinSafetyPageSkip
+  index.js          # Entry point and redirect logic
 ```
 
 ## Manifest
 
-Scripts are declared in `userscripts.json`. Each entry specifies the source entry point, output path, version, and URL patterns:
+Scripts are declared in `userscripts.json`. Each entry specifies the source entry point, output path, version, and URL patterns. An optional `"runAt"` field sets `@run-at` in the userscript metadata (e.g. `"document-start"`):
 
 ```json
 {
@@ -107,23 +122,6 @@ Scripts are declared in `userscripts.json`. Each entry specifies the source entr
 ```
 
 A script identifier uses the format `<site>/<script>` — e.g. `lacentrale.fr/LaCentraleEnhancer`.
-
-## CI / CD
-
-Two GitHub Actions workflows:
-
-**Build Validation** (`.github/workflows/build.yml`) — runs on every push and PR to `main`:
-
-1. `npm ci`
-2. Validates `userscripts.json`
-3. Builds all scripts via `npm run build:all`
-4. Verifies generated version metadata matches the manifest
-
-**Release** (`.github/workflows/release.yml`) — runs on push to `main` when `userscripts.json` changes, or manually via `workflow_dispatch`:
-
-1. Detects scripts whose version changed since the previous commit
-2. Builds each changed script
-3. Creates a GitHub Release with the compiled `.user.js` attached
 
 ## Release
 
